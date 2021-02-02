@@ -1,1 +1,1 @@
-# svg-path-parser
+# SVG Path Parser
