@@ -33,31 +33,24 @@ func ParsePath(data []byte) ([]Path, error) {
 }
 
 func parseElements(elements []element) ([]Path, error) {
-	var err error
-	var paths, newPaths []Path
+	var paths []Path
 	for _, e := range elements {
+		var err error
+		var newPaths []Path
+
 		switch e.XMLName.Local {
 		case groupElement:
 			newPaths, err = parseGroup(e.Value)
-			if err != nil {
-				return nil, err
-			}
-			if len(newPaths) == 0 {
-				continue
-			}
-
-			paths = append(paths, newPaths...)
 		case pathElement:
 			path := path{Data: string(e.Data)}
 			path.Clean()
 			newPaths, err = path.Parse()
-			if err != nil {
-				return nil, err
-			}
-			if len(newPaths) == 0 {
-				continue
-			}
+		}
 
+		if err != nil {
+			return nil, err
+		}
+		if len(newPaths) > 0 {
 			paths = append(paths, newPaths...)
 		}
 	}
