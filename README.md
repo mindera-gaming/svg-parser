@@ -7,7 +7,7 @@ as it only supports parsing path data, with no support for curve commands, excep
 
 Simply run the following command to install this package to your GOPATH:
 ```shell
-go get github.com/mindera-gaming/svg-path-parser
+go get github.com/mindera-gaming/svg-parser
 ```
 
 ### Usage
