@@ -29,15 +29,7 @@ func ParsePath(data []byte) ([]Path, error) {
 		return nil, err
 	}
 
-	var err error
-	var paths, newPaths []Path
-	newPaths, err = parseElements(svg.Elements)
-	if err != nil {
-		return nil, err
-	}
-	paths = append(paths, newPaths...)
-
-	return paths, nil
+	return parseElements(svg.Elements)
 }
 
 func parseElements(elements []element) ([]Path, error) {
@@ -81,13 +73,5 @@ func parseGroup(group []byte) ([]Path, error) {
 		return nil, err
 	}
 
-	var err error
-	var paths, newPaths []Path
-	newPaths, err = parseElements(g.Elements)
-	if err != nil {
-		return nil, err
-	}
-	paths = append(paths, newPaths...)
-
-	return paths, nil
+	return parseElements(g.Elements)
 }
