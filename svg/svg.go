@@ -26,59 +26,55 @@ type element struct {
 	Value   []byte `xml:",innerxml"`
 }
 
-var paths []Path
-
 func ParsePath(data []byte) ([]Path, error) {
 	svg := svgElements{}
 	if err := xml.Unmarshal(data, &svg); err != nil {
 		return nil, err
 	}
 
-	paths = nil
-	if err := parseElements(svg.Elements); err != nil {
-		return nil, err
-	}
-
-	return paths, nil
+	return parseElements(svg.Elements)
 }
 
-func parseElements(elements []element) error {
+func parseElements(elements []element) ([]Path, error) {
+	var paths []Path
 	for _, e := range elements {
 		var err error
-		var newPaths []PathData
+		var newPaths []Path
 
 		switch e.XMLName.Local {
 		case groupElement:
-			err = parseGroup(e.Value)
+			newPaths, err = parseGroup(e.Value)
 		case pathElement:
 			path := path{
 				ID:   string(e.ID),
 				Data: string(e.Data),
 			}
 			path.Clean()
-			newPaths, err = path.Parse()
+			var pathData []PathData
+			pathData, err = path.Parse()
+			newPaths = append(newPaths, Path{
+				ID:   path.ID,
+				Data: pathData,
+			})
 		}
 
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if len(newPaths) > 0 {
-			paths = append(paths, Path{
-				ID:   string(e.ID),
-				Data: newPaths,
-			})
+			paths = append(paths, newPaths...)
 		}
 	}
 
-	return nil
+	return paths, nil
 }
 
-func parseGroup(group []byte) error {
+func parseGroup(group []byte) ([]Path, error) {
 	group = append([]byte("<g>"), group...)
 	group = append(group, []byte("</g>")...)
 	g := groupElements{}
 	if err := xml.Unmarshal(group, &g); err != nil {
-		return err
+		return nil, err
 	}
 
 	return parseElements(g.Elements)
