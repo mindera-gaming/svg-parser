@@ -1,6 +1,8 @@
 package svg
 
-import "encoding/xml"
+import (
+	"encoding/xml"
+)
 
 const (
 	groupElement = "g"
@@ -19,9 +21,12 @@ type groupElements struct {
 
 type element struct {
 	XMLName xml.Name
+	ID      string `xml:"id,attr"`
 	Data    []byte `xml:"d,attr"`
 	Value   []byte `xml:",innerxml"`
 }
+
+var paths []Path
 
 func ParsePath(data []byte) ([]Path, error) {
 	svg := svgElements{}
@@ -29,41 +34,50 @@ func ParsePath(data []byte) ([]Path, error) {
 		return nil, err
 	}
 
-	return parseElements(svg.Elements)
-}
-
-func parseElements(elements []element) ([]Path, error) {
-	var paths []Path
-	for _, e := range elements {
-		var err error
-		var newPaths []Path
-
-		switch e.XMLName.Local {
-		case groupElement:
-			newPaths, err = parseGroup(e.Value)
-		case pathElement:
-			path := path{Data: string(e.Data)}
-			path.Clean()
-			newPaths, err = path.Parse()
-		}
-
-		if err != nil {
-			return nil, err
-		}
-		if len(newPaths) > 0 {
-			paths = append(paths, newPaths...)
-		}
+	if err := parseElements(svg.Elements); err != nil {
+		return nil, err
 	}
 
 	return paths, nil
 }
 
-func parseGroup(group []byte) ([]Path, error) {
+func parseElements(elements []element) error {
+	for _, e := range elements {
+		var err error
+		var newPaths []PathData
+
+		switch e.XMLName.Local {
+		case groupElement:
+			err = parseGroup(e.Value)
+		case pathElement:
+			path := path{
+				ID:   string(e.ID),
+				Data: string(e.Data),
+			}
+			path.Clean()
+			newPaths, err = path.Parse()
+		}
+
+		if err != nil {
+			return err
+		}
+		if len(newPaths) > 0 {
+			paths = append(paths, Path{
+				ID:   string(e.ID),
+				Data: newPaths,
+			})
+		}
+	}
+
+	return nil
+}
+
+func parseGroup(group []byte) error {
 	group = append([]byte("<g>"), group...)
 	group = append(group, []byte("</g>")...)
 	g := groupElements{}
 	if err := xml.Unmarshal(group, &g); err != nil {
-		return nil, err
+		return err
 	}
 
 	return parseElements(g.Elements)

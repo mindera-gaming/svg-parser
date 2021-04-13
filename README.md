@@ -22,6 +22,11 @@ func ParsePath(data []byte) ([]Path, error)
 
 ```go
 type Path struct {
+	ID   string
+	Data []PathData
+}
+
+type PathData struct {
     Start, End Point
     Control    [2]Point
 }
