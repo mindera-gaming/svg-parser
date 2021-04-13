@@ -34,6 +34,7 @@ func ParsePath(data []byte) ([]Path, error) {
 		return nil, err
 	}
 
+	paths = nil
 	if err := parseElements(svg.Elements); err != nil {
 		return nil, err
 	}
