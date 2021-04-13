@@ -7,6 +7,11 @@ import (
 )
 
 type Path struct {
+	ID   string
+	Data []PathData
+}
+
+type PathData struct {
 	Start, End Point
 	Control    [2]Point
 }
@@ -37,17 +42,17 @@ func (p *path) Clean() {
 	p.Data = strings.Join(strings.Fields(strings.ReplaceAll(p.Data, ",", " ")), " ")
 }
 
-func (p path) Parse() ([]Path, error) {
-	var paths []Path
+func (p path) Parse() ([]PathData, error) {
+	var paths []PathData
 
 	var currentAbsolute bool
 	var start int
 	var current, initial Point
-	var parser = func(options parserOptions, current, initial *Point) ([]Path, error) { return nil, nil }
+	var parser = func(options parserOptions, current, initial *Point) ([]PathData, error) { return nil, nil }
 	var updatePaths = func(end int) (err error) {
 		options := newParserOptions(p.Data, start, end, currentAbsolute)
 
-		var newPaths []Path
+		var newPaths []PathData
 		newPaths, err = parser(options, &current, &initial)
 		paths = append(paths, newPaths...)
 
@@ -118,7 +123,7 @@ func (p path) Parse() ([]Path, error) {
 				return nil, err
 			}
 
-			parser = func(parserOptions, *Point, *Point) ([]Path, error) { return nil, nil }
+			parser = func(parserOptions, *Point, *Point) ([]PathData, error) { return nil, nil }
 			paths = append(paths, parseClosePath(current, initial, &current))
 		}
 	}
@@ -130,7 +135,7 @@ func (p path) Parse() ([]Path, error) {
 	return paths, nil
 }
 
-func parseMoveTo(options parserOptions, point, initial *Point) ([]Path, error) {
+func parseMoveTo(options parserOptions, point, initial *Point) ([]PathData, error) {
 	command := func() string { return command(options, "M", "m") }
 
 	if len(options.Data) == 0 {
@@ -158,7 +163,7 @@ func parseMoveTo(options parserOptions, point, initial *Point) ([]Path, error) {
 	initial.Y = point.Y
 
 	previous := *point
-	paths := make([]Path, len(options.Data)/2-1)
+	paths := make([]PathData, len(options.Data)/2-1)
 	for i := 2; i < len(options.Data); i += 2 {
 		if options.Absolute {
 			point.Reset()
@@ -178,7 +183,7 @@ func parseMoveTo(options parserOptions, point, initial *Point) ([]Path, error) {
 
 		current := *point
 		middle := Point{X: 0.5 * (previous.X + current.X), Y: 0.5 * (previous.Y + current.Y)}
-		paths[i/2] = Path{
+		paths[i/2] = PathData{
 			Start:   previous,
 			End:     current,
 			Control: [2]Point{middle, middle},
@@ -189,7 +194,7 @@ func parseMoveTo(options parserOptions, point, initial *Point) ([]Path, error) {
 	return paths, nil
 }
 
-func parseLineTo(options parserOptions, point, initial *Point) ([]Path, error) {
+func parseLineTo(options parserOptions, point, initial *Point) ([]PathData, error) {
 	command := func() string { return command(options, "L", "l") }
 
 	if len(options.Data) == 0 {
@@ -199,7 +204,7 @@ func parseLineTo(options parserOptions, point, initial *Point) ([]Path, error) {
 	}
 
 	previous := *point
-	paths := make([]Path, len(options.Data)/2)
+	paths := make([]PathData, len(options.Data)/2)
 	for i := 0; i < len(options.Data); i += 2 {
 		if options.Absolute {
 			point.Reset()
@@ -219,7 +224,7 @@ func parseLineTo(options parserOptions, point, initial *Point) ([]Path, error) {
 
 		current := *point
 		middle := Point{X: 0.5 * (previous.X + current.X), Y: 0.5 * (previous.Y + current.Y)}
-		paths[i/2] = Path{
+		paths[i/2] = PathData{
 			Start:   previous,
 			End:     current,
 			Control: [2]Point{middle, middle},
@@ -230,7 +235,7 @@ func parseLineTo(options parserOptions, point, initial *Point) ([]Path, error) {
 	return paths, nil
 }
 
-func parseHorizontalTo(options parserOptions, point, initial *Point) ([]Path, error) {
+func parseHorizontalTo(options parserOptions, point, initial *Point) ([]PathData, error) {
 	command := func() string { return command(options, "H", "h") }
 
 	if len(options.Data) == 0 {
@@ -238,7 +243,7 @@ func parseHorizontalTo(options parserOptions, point, initial *Point) ([]Path, er
 	}
 
 	previous := point.X
-	paths := make([]Path, len(options.Data))
+	paths := make([]PathData, len(options.Data))
 	for i, c := range options.Data {
 		if options.Absolute {
 			point.X = 0
@@ -253,7 +258,7 @@ func parseHorizontalTo(options parserOptions, point, initial *Point) ([]Path, er
 
 		current := point.X
 		middle := Point{X: 0.5 * (previous + current), Y: point.Y}
-		paths[i] = Path{
+		paths[i] = PathData{
 			Start:   Point{X: previous, Y: point.Y},
 			End:     Point{X: current, Y: point.Y},
 			Control: [2]Point{middle, middle},
@@ -264,7 +269,7 @@ func parseHorizontalTo(options parserOptions, point, initial *Point) ([]Path, er
 	return paths, nil
 }
 
-func parseVerticalTo(options parserOptions, point, initial *Point) ([]Path, error) {
+func parseVerticalTo(options parserOptions, point, initial *Point) ([]PathData, error) {
 	command := func() string { return command(options, "V", "v") }
 
 	if len(options.Data) == 0 {
@@ -272,7 +277,7 @@ func parseVerticalTo(options parserOptions, point, initial *Point) ([]Path, erro
 	}
 
 	previous := point.Y
-	paths := make([]Path, len(options.Data))
+	paths := make([]PathData, len(options.Data))
 	for i, c := range options.Data {
 		if options.Absolute {
 			point.Y = 0
@@ -287,7 +292,7 @@ func parseVerticalTo(options parserOptions, point, initial *Point) ([]Path, erro
 
 		current := point.Y
 		middle := Point{X: point.X, Y: 0.5 * (previous + current)}
-		paths[i] = Path{
+		paths[i] = PathData{
 			Start:   Point{X: point.X, Y: previous},
 			End:     Point{X: point.X, Y: current},
 			Control: [2]Point{middle, middle},
@@ -298,7 +303,7 @@ func parseVerticalTo(options parserOptions, point, initial *Point) ([]Path, erro
 	return paths, nil
 }
 
-func parseCurveTo(options parserOptions, point, initial *Point) ([]Path, error) {
+func parseCurveTo(options parserOptions, point, initial *Point) ([]PathData, error) {
 	command := func() string { return command(options, "C", "c") }
 
 	if len(options.Data) == 0 {
@@ -308,7 +313,7 @@ func parseCurveTo(options parserOptions, point, initial *Point) ([]Path, error) 
 	}
 
 	previous := *point
-	paths := make([]Path, len(options.Data)/6)
+	paths := make([]PathData, len(options.Data)/6)
 	var err error
 	for i := 0; i < len(options.Data); i += 6 {
 		if options.Absolute {
@@ -330,7 +335,7 @@ func parseCurveTo(options parserOptions, point, initial *Point) ([]Path, error) 
 
 		current := *point
 		end := current.Add(points[2])
-		paths[i/6] = Path{
+		paths[i/6] = PathData{
 			Start:   previous,
 			End:     end,
 			Control: [2]Point{current.Add(points[0]), current.Add(points[1])},
@@ -344,12 +349,12 @@ func parseCurveTo(options parserOptions, point, initial *Point) ([]Path, error) 
 	return paths, nil
 }
 
-func parseClosePath(start, end Point, current *Point) Path {
+func parseClosePath(start, end Point, current *Point) PathData {
 	middle := Point{X: 0.5 * (start.X + end.X), Y: 0.5 * (start.Y + end.Y)}
 	current.X = start.X
 	current.Y = start.Y
 
-	return Path{
+	return PathData{
 		Start:   start,
 		End:     end,
 		Control: [2]Point{middle, middle},
