@@ -408,8 +408,8 @@ func optimizePaths(paths []PathData, slopeTolerance float64) (optimizedPaths []P
 				Control: [2]vector2.Point{middle, middle},
 			})
 
-			// skips the already removed paths
-			i = lastPath
+			// skips the already "removed" paths
+			i = lastPath + 1
 			continue
 		}
 
