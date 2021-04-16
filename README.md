@@ -18,8 +18,17 @@ The `svg` package API exposes one function:
 func ParsePath(data []byte) ([]Path, error)
 ```
 
-`ParsePath` takes an entire XML file as a `[]byte` and returns a `[]Path`.
+The `ParsePath` takes an entire XML file as a `[]byte` and some `ParserOptions` settings.  
+At the end, it returns a `[]Path`.
 
+`ParserOptions` structure:
+```go
+type ParserOptions struct {
+	SlopeTolerance float64 // tolerance to ignore path nodes that are probably not visible to the naked eye
+}
+```
+
+`Path` structure:
 ```go
 type Path struct {
 	ID   string

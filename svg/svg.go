@@ -34,7 +34,7 @@ type element struct {
 
 // ParserOptions are used to configure the parse of the SVG
 type ParserOptions struct {
-	// tolerance to ignore path nodes that are not visible to the naked eye
+	// tolerance to ignore path nodes that are probably not visible to the naked eye
 	SlopeTolerance float64
 }
 
