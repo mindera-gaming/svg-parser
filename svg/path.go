@@ -381,7 +381,7 @@ func optimizePaths(paths []PathData, slopeTolerance float64) (optimizedPaths []P
 		// cycles through the adjacent paths to the current one
 		for j := i + 1; j < len(paths); j++ {
 			// slope difference between the path to be tested and the last acceptable path
-			slope := math.Abs(paths[j].Start.Slope(paths[j].End) - paths[lastPath].Start.Slope(paths[lastPath].End))
+			slope := math.Abs(paths[j].Start.Slope(paths[j].End) - paths[i].Start.Slope(paths[i].End))
 			// checks the possibility of the calculation
 			if math.IsInf(slope, 1) {
 				slope = 0
