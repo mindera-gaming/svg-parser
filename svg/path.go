@@ -410,7 +410,14 @@ func optimizePaths(paths []PathData, slopeTolerance float64) (optimizedPaths []P
 
 			// skips the already removed paths
 			i = lastPath
+			continue
 		}
+
+		// no optimization is required in this path
+		optimizedPaths = append(optimizedPaths, paths[i])
+
+		// go to the next path
+		i++
 	}
 	return
 }
