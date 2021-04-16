@@ -2,8 +2,11 @@ package svg
 
 import (
 	"encoding/xml"
+	"math"
 	"strconv"
 	"strings"
+
+	"github.com/mindera-gaming/go-math/vector2"
 )
 
 type Path struct {
@@ -12,8 +15,8 @@ type Path struct {
 }
 
 type PathData struct {
-	Start, End Point
-	Control    [2]Point
+	Start, End vector2.Point
+	Control    [2]vector2.Point
 }
 
 type parserOptions struct {
@@ -42,18 +45,19 @@ func (p *path) Clean() {
 	p.Data = strings.Join(strings.Fields(strings.ReplaceAll(p.Data, ",", " ")), " ")
 }
 
-func (p path) Parse() ([]PathData, error) {
+func (p path) Parse(slopeTolerance float64) ([]PathData, error) {
 	var paths []PathData
 
 	var currentAbsolute bool
 	var start int
-	var current, initial Point
-	var parser = func(options parserOptions, current, initial *Point) ([]PathData, error) { return nil, nil }
+	var current, initial vector2.Point
+	var parser = func(options parserOptions, current, initial *vector2.Point) ([]PathData, error) { return nil, nil }
 	var updatePaths = func(end int) (err error) {
 		options := newParserOptions(p.Data, start, end, currentAbsolute)
 
 		var newPaths []PathData
 		newPaths, err = parser(options, &current, &initial)
+		newPaths = optimizePaths(newPaths, slopeTolerance)
 		paths = append(paths, newPaths...)
 
 		return
@@ -123,7 +127,7 @@ func (p path) Parse() ([]PathData, error) {
 				return nil, err
 			}
 
-			parser = func(parserOptions, *Point, *Point) ([]PathData, error) { return nil, nil }
+			parser = func(parserOptions, *vector2.Point, *vector2.Point) ([]PathData, error) { return nil, nil }
 			paths = append(paths, parseClosePath(current, initial, &current))
 		}
 	}
@@ -135,13 +139,13 @@ func (p path) Parse() ([]PathData, error) {
 	return paths, nil
 }
 
-func parseMoveTo(options parserOptions, point, initial *Point) ([]PathData, error) {
-	command := func() string { return command(options, "M", "m") }
+func parseMoveTo(options parserOptions, point, initial *vector2.Point) ([]PathData, error) {
+	command := command(options, "M", "m")
 
 	if len(options.Data) == 0 {
-		return nil, newEmptyCoordinateError(command())
+		return nil, newEmptyCoordinateError(command)
 	} else if len(options.Data)%2 != 0 {
-		return nil, newInvalidCoordinateError(command(), options.Data)
+		return nil, newInvalidCoordinateError(command, options.Data)
 	}
 
 	if options.Absolute {
@@ -149,11 +153,11 @@ func parseMoveTo(options parserOptions, point, initial *Point) ([]PathData, erro
 	}
 	x, err := strconv.ParseFloat(options.Data[0], 0)
 	if err != nil {
-		return nil, newInvalidXError(command(), options.Data[0])
+		return nil, newInvalidXError(command, options.Data[0])
 	}
 	y, err := strconv.ParseFloat(options.Data[1], 0)
 	if err != nil {
-		return nil, newInvalidYError(command(), options.Data[1])
+		return nil, newInvalidYError(command, options.Data[1])
 	}
 
 	point.X += x
@@ -171,22 +175,22 @@ func parseMoveTo(options parserOptions, point, initial *Point) ([]PathData, erro
 
 		x, err = strconv.ParseFloat(options.Data[i], 0)
 		if err != nil {
-			return nil, newInvalidXError(command(), options.Data[i])
+			return nil, newInvalidXError(command, options.Data[i])
 		}
 		y, err = strconv.ParseFloat(options.Data[i+1], 0)
 		if err != nil {
-			return nil, newInvalidYError(command(), options.Data[i+1])
+			return nil, newInvalidYError(command, options.Data[i+1])
 		}
 
 		point.X += x
 		point.Y += y
 
 		current := *point
-		middle := Point{X: 0.5 * (previous.X + current.X), Y: 0.5 * (previous.Y + current.Y)}
+		middle := vector2.Point{X: 0.5 * (previous.X + current.X), Y: 0.5 * (previous.Y + current.Y)}
 		paths[i/2] = PathData{
 			Start:   previous,
 			End:     current,
-			Control: [2]Point{middle, middle},
+			Control: [2]vector2.Point{middle, middle},
 		}
 		previous = current
 	}
@@ -194,13 +198,13 @@ func parseMoveTo(options parserOptions, point, initial *Point) ([]PathData, erro
 	return paths, nil
 }
 
-func parseLineTo(options parserOptions, point, initial *Point) ([]PathData, error) {
-	command := func() string { return command(options, "L", "l") }
+func parseLineTo(options parserOptions, point, initial *vector2.Point) ([]PathData, error) {
+	command := command(options, "L", "l")
 
 	if len(options.Data) == 0 {
-		return nil, newEmptyCoordinateError(command())
+		return nil, newEmptyCoordinateError(command)
 	} else if len(options.Data)%2 != 0 {
-		return nil, newInvalidCoordinateError(command(), options.Data)
+		return nil, newInvalidCoordinateError(command, options.Data)
 	}
 
 	previous := *point
@@ -212,22 +216,22 @@ func parseLineTo(options parserOptions, point, initial *Point) ([]PathData, erro
 
 		x, err := strconv.ParseFloat(options.Data[i], 0)
 		if err != nil {
-			return nil, newInvalidXError(command(), options.Data[i])
+			return nil, newInvalidXError(command, options.Data[i])
 		}
 		y, err := strconv.ParseFloat(options.Data[i+1], 0)
 		if err != nil {
-			return nil, newInvalidYError(command(), options.Data[i+1])
+			return nil, newInvalidYError(command, options.Data[i+1])
 		}
 
 		point.X += x
 		point.Y += y
 
 		current := *point
-		middle := Point{X: 0.5 * (previous.X + current.X), Y: 0.5 * (previous.Y + current.Y)}
+		middle := vector2.Point{X: 0.5 * (previous.X + current.X), Y: 0.5 * (previous.Y + current.Y)}
 		paths[i/2] = PathData{
 			Start:   previous,
 			End:     current,
-			Control: [2]Point{middle, middle},
+			Control: [2]vector2.Point{middle, middle},
 		}
 		previous = current
 	}
@@ -235,11 +239,11 @@ func parseLineTo(options parserOptions, point, initial *Point) ([]PathData, erro
 	return paths, nil
 }
 
-func parseHorizontalTo(options parserOptions, point, initial *Point) ([]PathData, error) {
-	command := func() string { return command(options, "H", "h") }
+func parseHorizontalTo(options parserOptions, point, initial *vector2.Point) ([]PathData, error) {
+	command := command(options, "H", "h")
 
 	if len(options.Data) == 0 {
-		return nil, newEmptyCoordinateError(command())
+		return nil, newEmptyCoordinateError(command)
 	}
 
 	previous := point.X
@@ -251,17 +255,17 @@ func parseHorizontalTo(options parserOptions, point, initial *Point) ([]PathData
 
 		x, err := strconv.ParseFloat(c, 0)
 		if err != nil {
-			return nil, newInvalidXError(command(), c)
+			return nil, newInvalidXError(command, c)
 		}
 
 		point.X += x
 
 		current := point.X
-		middle := Point{X: 0.5 * (previous + current), Y: point.Y}
+		middle := vector2.Point{X: 0.5 * (previous + current), Y: point.Y}
 		paths[i] = PathData{
-			Start:   Point{X: previous, Y: point.Y},
-			End:     Point{X: current, Y: point.Y},
-			Control: [2]Point{middle, middle},
+			Start:   vector2.Point{X: previous, Y: point.Y},
+			End:     vector2.Point{X: current, Y: point.Y},
+			Control: [2]vector2.Point{middle, middle},
 		}
 		previous = point.X
 	}
@@ -269,11 +273,11 @@ func parseHorizontalTo(options parserOptions, point, initial *Point) ([]PathData
 	return paths, nil
 }
 
-func parseVerticalTo(options parserOptions, point, initial *Point) ([]PathData, error) {
-	command := func() string { return command(options, "V", "v") }
+func parseVerticalTo(options parserOptions, point, initial *vector2.Point) ([]PathData, error) {
+	command := command(options, "V", "v")
 
 	if len(options.Data) == 0 {
-		return nil, newEmptyCoordinateError(command())
+		return nil, newEmptyCoordinateError(command)
 	}
 
 	previous := point.Y
@@ -285,17 +289,17 @@ func parseVerticalTo(options parserOptions, point, initial *Point) ([]PathData, 
 
 		y, err := strconv.ParseFloat(c, 0)
 		if err != nil {
-			return nil, newInvalidYError(command(), c)
+			return nil, newInvalidYError(command, c)
 		}
 
 		point.Y += y
 
 		current := point.Y
-		middle := Point{X: point.X, Y: 0.5 * (previous + current)}
+		middle := vector2.Point{X: point.X, Y: 0.5 * (previous + current)}
 		paths[i] = PathData{
-			Start:   Point{X: point.X, Y: previous},
-			End:     Point{X: point.X, Y: current},
-			Control: [2]Point{middle, middle},
+			Start:   vector2.Point{X: point.X, Y: previous},
+			End:     vector2.Point{X: point.X, Y: current},
+			Control: [2]vector2.Point{middle, middle},
 		}
 		previous = point.X
 	}
@@ -303,13 +307,13 @@ func parseVerticalTo(options parserOptions, point, initial *Point) ([]PathData, 
 	return paths, nil
 }
 
-func parseCurveTo(options parserOptions, point, initial *Point) ([]PathData, error) {
-	command := func() string { return command(options, "C", "c") }
+func parseCurveTo(options parserOptions, point, initial *vector2.Point) ([]PathData, error) {
+	command := command(options, "C", "c")
 
 	if len(options.Data) == 0 {
-		return nil, newEmptyCoordinateError(command())
+		return nil, newEmptyCoordinateError(command)
 	} else if len(options.Data)%6 != 0 {
-		return nil, newInvalidCoordinateError(command(), options.Data)
+		return nil, newInvalidCoordinateError(command, options.Data)
 	}
 
 	previous := *point
@@ -320,16 +324,16 @@ func parseCurveTo(options parserOptions, point, initial *Point) ([]PathData, err
 			point.Reset()
 		}
 
-		var points [3]Point
+		var points [3]vector2.Point
 		for j := range points {
 			k := i + j*2
 			points[j].X, err = strconv.ParseFloat(options.Data[k], 0)
 			if err != nil {
-				return nil, newInvalidXError(command(), options.Data[k])
+				return nil, newInvalidXError(command, options.Data[k])
 			}
 			points[j].Y, err = strconv.ParseFloat(options.Data[k+1], 0)
 			if err != nil {
-				return nil, newInvalidYError(command(), options.Data[k+1])
+				return nil, newInvalidYError(command, options.Data[k+1])
 			}
 		}
 
@@ -338,7 +342,7 @@ func parseCurveTo(options parserOptions, point, initial *Point) ([]PathData, err
 		paths[i/6] = PathData{
 			Start:   previous,
 			End:     end,
-			Control: [2]Point{current.Add(points[0]), current.Add(points[1])},
+			Control: [2]vector2.Point{current.Add(points[0]), current.Add(points[1])},
 		}
 		previous = end
 
@@ -349,15 +353,15 @@ func parseCurveTo(options parserOptions, point, initial *Point) ([]PathData, err
 	return paths, nil
 }
 
-func parseClosePath(start, end Point, current *Point) PathData {
-	middle := Point{X: 0.5 * (start.X + end.X), Y: 0.5 * (start.Y + end.Y)}
+func parseClosePath(start, end vector2.Point, current *vector2.Point) PathData {
+	middle := vector2.Point{X: 0.5 * (start.X + end.X), Y: 0.5 * (start.Y + end.Y)}
 	current.X = start.X
 	current.Y = start.Y
 
 	return PathData{
 		Start:   start,
 		End:     end,
-		Control: [2]Point{middle, middle},
+		Control: [2]vector2.Point{middle, middle},
 	}
 }
 
@@ -365,6 +369,48 @@ func command(options parserOptions, absoluteCommand, relativeCommand string) str
 	if options.Absolute {
 		return absoluteCommand
 	}
-
 	return relativeCommand
+}
+
+// optimizePaths removes unnecessary paths
+func optimizePaths(paths []PathData, slopeTolerance float64) (optimizedPaths []PathData) {
+	for i := 0; i < len(paths); {
+		// index of the last acceptable path
+		lastPath := i
+
+		// cycles through the adjacent paths to the current one
+		for j := i + 1; j < len(paths); j++ {
+			// slope difference between the path to be tested and the last acceptable path
+			slope := math.Abs(paths[j].Start.Slope(paths[j].End) - paths[lastPath].Start.Slope(paths[lastPath].End))
+			// checks the possibility of the calculation
+			if math.IsInf(slope, 1) {
+				slope = 0
+			}
+
+			// checks if this path can be joined with the initial one
+			if slope < slopeTolerance {
+				lastPath = j
+			} else {
+				break
+			}
+		}
+
+		// checks if it is necessary to optimize the current path
+		if i != lastPath {
+			// joins the paths
+			middle := vector2.Point{
+				X: 0.5 * (paths[i].Start.X + paths[lastPath].End.X),
+				Y: 0.5 * (paths[i].Start.Y + paths[lastPath].End.Y),
+			}
+			optimizedPaths = append(optimizedPaths, PathData{
+				Start:   paths[i].Start,
+				End:     paths[lastPath].End,
+				Control: [2]vector2.Point{middle, middle},
+			})
+
+			// skips the already removed paths
+			i = lastPath
+		}
+	}
+	return
 }

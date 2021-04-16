@@ -1,0 +1,5 @@
+github.com/google/uuid v1.2.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
+github.com/mindera-gaming/go-math v0.3.1-0.20210415155120-035b14358bf1 h1:2NfmQBwzd4ou9WF2a0A9iLugWAnBQYunW/jh4P31N84=
+github.com/mindera-gaming/go-math v0.3.1-0.20210415155120-035b14358bf1/go.mod h1:PJg9RurCr2rE3EN/0VLQYbnzT4j9Q/KC/xOSt4VBFrU=
+github.com/mindera-gaming/go-math v0.3.1-0.20210415162530-250cad3fc941 h1:osrVl/uUxMbY8MOCSgG8yKT0ttYTetfzROByhhwH/JU=
+github.com/mindera-gaming/go-math v0.3.1-0.20210415162530-250cad3fc941/go.mod h1:PJg9RurCr2rE3EN/0VLQYbnzT4j9Q/KC/xOSt4VBFrU=
