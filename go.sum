@@ -3,3 +3,5 @@ github.com/mindera-gaming/go-math v0.3.1-0.20210415155120-035b14358bf1 h1:2NfmQB
 github.com/mindera-gaming/go-math v0.3.1-0.20210415155120-035b14358bf1/go.mod h1:PJg9RurCr2rE3EN/0VLQYbnzT4j9Q/KC/xOSt4VBFrU=
 github.com/mindera-gaming/go-math v0.3.1-0.20210415162530-250cad3fc941 h1:osrVl/uUxMbY8MOCSgG8yKT0ttYTetfzROByhhwH/JU=
 github.com/mindera-gaming/go-math v0.3.1-0.20210415162530-250cad3fc941/go.mod h1:PJg9RurCr2rE3EN/0VLQYbnzT4j9Q/KC/xOSt4VBFrU=
+github.com/mindera-gaming/go-math v0.4.0 h1:j4rI0J/+iqgFYTH9JC9lr7x3ehR67B1+9aU+JSpfeqw=
+github.com/mindera-gaming/go-math v0.4.0/go.mod h1:PJg9RurCr2rE3EN/0VLQYbnzT4j9Q/KC/xOSt4VBFrU=
