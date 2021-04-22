@@ -1,5 +1,8 @@
 package svg
 
+// For more information on the "d" attribute:
+// - https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/d
+
 import (
 	"encoding/xml"
 	"math"
@@ -9,30 +12,31 @@ import (
 	"github.com/mindera-gaming/go-math/vector2"
 )
 
-type Path struct {
-	ID   string
-	Data []PathData
-}
-
+// PathData represents the "d" attribute that defines a path to be drawn
 type PathData struct {
 	Start, End vector2.Point
 	Control    [2]vector2.Point
 }
 
+// parserOptions are essential for the parse of the different commands
 type parserOptions struct {
-	Data     []string
-	Absolute bool
+	Data           []string
+	Absolute       bool
+	SlopeTolerance float64
 }
 
-func newParserOptions(data string, start, end int, absolute bool) parserOptions {
+// newParserOptions creates and returns a new parser options structure
+func newParserOptions(options ParserOptions, data string, start, end int, absolute bool) parserOptions {
 	data = data[start:end]
 
 	return parserOptions{
-		Data:     strings.Split(strings.TrimSpace(data), " "),
-		Absolute: absolute,
+		Data:           strings.Split(strings.TrimSpace(data), " "),
+		Absolute:       absolute,
+		SlopeTolerance: options.SlopeTolerance,
 	}
 }
 
+// path represents the structure of a path element
 type path struct {
 	XMLName xml.Name `xml:"path"`
 	ID      string   `xml:"id,attr"`
@@ -40,12 +44,14 @@ type path struct {
 	Data    string   `xml:"d,attr"`
 }
 
+// Clean the current path to facilitate further processes
 func (p *path) Clean() {
 	// TODO: consider using regex. Might be better (more performant/less memory usage) than this
 	p.Data = strings.Join(strings.Fields(strings.ReplaceAll(p.Data, ",", " ")), " ")
 }
 
-func (p path) Parse(slopeTolerance float64) ([]PathData, error) {
+// Parse the current path
+func (p path) Parse(options ParserOptions) ([]PathData, error) {
 	var paths []PathData
 
 	var currentAbsolute bool
@@ -53,11 +59,10 @@ func (p path) Parse(slopeTolerance float64) ([]PathData, error) {
 	var current, initial vector2.Point
 	var parser = func(options parserOptions, current, initial *vector2.Point) ([]PathData, error) { return nil, nil }
 	var updatePaths = func(end int) (err error) {
-		options := newParserOptions(p.Data, start, end, currentAbsolute)
+		options := newParserOptions(options, p.Data, start, end, currentAbsolute)
 
 		var newPaths []PathData
 		newPaths, err = parser(options, &current, &initial)
-		newPaths = optimizePaths(newPaths, slopeTolerance)
 		paths = append(paths, newPaths...)
 
 		return
@@ -139,224 +144,313 @@ func (p path) Parse(slopeTolerance float64) ([]PathData, error) {
 	return paths, nil
 }
 
-func parseMoveTo(options parserOptions, point, initial *vector2.Point) ([]PathData, error) {
-	command := command(options, "M", "m")
+// parseMoveTo parses a "MoveTo" command
+func parseMoveTo(options parserOptions, lastPoint, initial *vector2.Point) ([]PathData, error) {
+	// represents the current command
+	command := command(options.Absolute, "M", "m")
 
+	// checks if there is no data to be parsed
+	// or if the data has invalid coordinates
 	if len(options.Data) == 0 {
 		return nil, newEmptyCoordinateError(command)
 	} else if len(options.Data)%2 != 0 {
 		return nil, newInvalidCoordinateError(command, options.Data)
 	}
 
+	// checks the relativity of this command
 	if options.Absolute {
-		point.Reset()
+		// resets the last (parsed) point
+		lastPoint.Reset()
 	}
-	x, err := strconv.ParseFloat(options.Data[0], 0)
+	// parsing the initial point (called 'previous' to make it easier to distinguish further on)
+	previous, err := parsePoint(options.Data[0], options.Data[1], command)
 	if err != nil {
-		return nil, newInvalidXError(command, options.Data[0])
+		return nil, err
 	}
-	y, err := strconv.ParseFloat(options.Data[1], 0)
-	if err != nil {
-		return nil, newInvalidYError(command, options.Data[1])
-	}
+	// updating the last point
+	lastPoint.Add(previous)
 
-	point.X += x
-	point.Y += y
+	// updating the initial point
+	*initial = *lastPoint
 
-	initial.X = point.X
-	initial.Y = point.Y
-
-	previous := *point
-	paths := make([]PathData, len(options.Data)/2-1)
+	// updating of the previous point, since it corresponds to the last one
+	previous = *lastPoint
+	// contain all the parsed paths
+	var paths []PathData
+	// cycles through all the data this command contains
 	for i := 2; i < len(options.Data); i += 2 {
+		// current optimised point index
+		currentIndex, err := optimizePoints(previous, *lastPoint, i, command, options)
+		if err != nil {
+			return nil, err
+		}
+
+		// checks if there has been any optimisation
+		if i != currentIndex {
+			// sets the index of the optimised point
+			i = currentIndex
+		}
+
 		if options.Absolute {
-			point.Reset()
+			lastPoint.Reset()
 		}
-
-		x, err = strconv.ParseFloat(options.Data[i], 0)
+		// parsing the current optimised point
+		current, err := parsePoint(options.Data[i], options.Data[i+1], command)
 		if err != nil {
-			return nil, newInvalidXError(command, options.Data[i])
+			return nil, err
 		}
-		y, err = strconv.ParseFloat(options.Data[i+1], 0)
-		if err != nil {
-			return nil, newInvalidYError(command, options.Data[i+1])
-		}
+		// updating the last point
+		lastPoint.Add(current)
 
-		point.X += x
-		point.Y += y
-
-		current := *point
+		// updating of the current point, since it corresponds to the last one
+		current = *lastPoint
+		// represents the middle of the path
 		middle := vector2.Point{X: 0.5 * (previous.X + current.X), Y: 0.5 * (previous.Y + current.Y)}
-		paths[i/2] = PathData{
+		// adding the new path
+		paths = append(paths, PathData{
 			Start:   previous,
 			End:     current,
 			Control: [2]vector2.Point{middle, middle},
-		}
+		})
+
+		// updating of the previous point, since it corresponds to the current one
 		previous = current
 	}
 
 	return paths, nil
 }
 
-func parseLineTo(options parserOptions, point, initial *vector2.Point) ([]PathData, error) {
-	command := command(options, "L", "l")
+// parseLineTo parses a "LineTo" command
+func parseLineTo(options parserOptions, lastPoint, initial *vector2.Point) ([]PathData, error) {
+	// represents the current command
+	command := command(options.Absolute, "L", "l")
 
+	// checks if there is no data to be parsed
+	// or if the data has invalid coordinates
 	if len(options.Data) == 0 {
 		return nil, newEmptyCoordinateError(command)
 	} else if len(options.Data)%2 != 0 {
 		return nil, newInvalidCoordinateError(command, options.Data)
 	}
 
-	previous := *point
-	paths := make([]PathData, len(options.Data)/2)
+	// initial/previous point to next point (current)
+	previous := *lastPoint
+	// contain all the parsed paths
+	var paths []PathData
+	// cycles through all the data this command contains
 	for i := 0; i < len(options.Data); i += 2 {
+		// current optimised point index
+		currentIndex, err := optimizePoints(previous, *lastPoint, i, command, options)
+		if err != nil {
+			return nil, err
+		}
+
+		// checks if there has been any optimisation
+		if i != currentIndex {
+			// sets the index of the optimised point
+			i = currentIndex
+		}
+
 		if options.Absolute {
-			point.Reset()
+			lastPoint.Reset()
 		}
-
-		x, err := strconv.ParseFloat(options.Data[i], 0)
+		// parsing the current optimised point
+		current, err := parsePoint(options.Data[i], options.Data[i+1], command)
 		if err != nil {
-			return nil, newInvalidXError(command, options.Data[i])
+			return nil, err
 		}
-		y, err := strconv.ParseFloat(options.Data[i+1], 0)
-		if err != nil {
-			return nil, newInvalidYError(command, options.Data[i+1])
-		}
+		// updating the last point
+		lastPoint.Add(current)
 
-		point.X += x
-		point.Y += y
-
-		current := *point
+		// updating of the current point, since it corresponds to the last one
+		current = *lastPoint
+		// represents the middle of the path
 		middle := vector2.Point{X: 0.5 * (previous.X + current.X), Y: 0.5 * (previous.Y + current.Y)}
-		paths[i/2] = PathData{
+		// adding the new path
+		paths = append(paths, PathData{
 			Start:   previous,
 			End:     current,
 			Control: [2]vector2.Point{middle, middle},
-		}
+		})
+
+		// updating of the previous point, since it corresponds to the current one
 		previous = current
 	}
 
 	return paths, nil
 }
 
-func parseHorizontalTo(options parserOptions, point, initial *vector2.Point) ([]PathData, error) {
-	command := command(options, "H", "h")
+// parseHorizontalTo parses a horizontal "LineTo" command
+func parseHorizontalTo(options parserOptions, lastPoint, initial *vector2.Point) ([]PathData, error) {
+	// represents the current command
+	command := command(options.Absolute, "H", "h")
 
+	// checks if there is no data to be parsed
 	if len(options.Data) == 0 {
 		return nil, newEmptyCoordinateError(command)
 	}
 
-	previous := point.X
-	paths := make([]PathData, len(options.Data))
-	for i, c := range options.Data {
-		if options.Absolute {
-			point.X = 0
-		}
-
-		x, err := strconv.ParseFloat(c, 0)
+	// initial point (called 'previous' to make it easier to distinguish further on)
+	previous := lastPoint.X
+	// contain all the parsed paths
+	var paths []PathData
+	// cycles through all the data this command contains
+	for i := 0; i < len(options.Data); i++ {
+		// current optimised point index
+		currentIndex, err := optimizeHorizontalPoints(previous, *lastPoint, i, command, options)
 		if err != nil {
-			return nil, newInvalidXError(command, c)
+			return nil, err
 		}
 
-		point.X += x
+		// checks if there has been any optimisation
+		if i != currentIndex {
+			// sets the index of the optimised point
+			i = currentIndex
+		}
 
-		current := point.X
-		middle := vector2.Point{X: 0.5 * (previous + current), Y: point.Y}
-		paths[i] = PathData{
-			Start:   vector2.Point{X: previous, Y: point.Y},
-			End:     vector2.Point{X: current, Y: point.Y},
+		if options.Absolute {
+			lastPoint.X = 0
+		}
+		// parsing the current optimised point
+		current, err := parseAbscissa(options.Data[i], command)
+		if err != nil {
+			return nil, err
+		}
+		// updating the last point
+		lastPoint.X += current
+
+		// updating of the current point, since it corresponds to the last one
+		current = lastPoint.X
+		// represents the middle of the path
+		middle := vector2.Point{X: 0.5 * (previous + current), Y: lastPoint.Y}
+		// adding the new path
+		paths = append(paths, PathData{
+			Start:   vector2.Point{X: previous, Y: lastPoint.Y},
+			End:     vector2.Point{X: current, Y: lastPoint.Y},
 			Control: [2]vector2.Point{middle, middle},
-		}
-		previous = point.X
+		})
+
+		// updating of the previous point, since it corresponds to the current one
+		previous = current
 	}
 
 	return paths, nil
 }
 
-func parseVerticalTo(options parserOptions, point, initial *vector2.Point) ([]PathData, error) {
-	command := command(options, "V", "v")
+// parseVerticalTo parses a vertical "LineTo" command
+func parseVerticalTo(options parserOptions, lastPoint, initial *vector2.Point) ([]PathData, error) {
+	// represents the current command
+	command := command(options.Absolute, "V", "v")
 
+	// checks if there is no data to be parsed
 	if len(options.Data) == 0 {
 		return nil, newEmptyCoordinateError(command)
 	}
 
-	previous := point.Y
-	paths := make([]PathData, len(options.Data))
-	for i, c := range options.Data {
-		if options.Absolute {
-			point.Y = 0
-		}
-
-		y, err := strconv.ParseFloat(c, 0)
+	// initial point (called 'previous' to make it easier to distinguish further on)
+	previous := lastPoint.Y
+	// contain all the parsed paths
+	var paths []PathData
+	// cycles through all the data this command contains
+	for i := 0; i < len(options.Data); i++ {
+		// current optimised point index
+		currentIndex, err := optimizeVerticalPoints(previous, *lastPoint, i, command, options)
 		if err != nil {
-			return nil, newInvalidYError(command, c)
+			return nil, err
 		}
 
-		point.Y += y
+		// checks if there has been any optimisation
+		if i != currentIndex {
+			// sets the index of the optimised point
+			i = currentIndex
+		}
 
-		current := point.Y
-		middle := vector2.Point{X: point.X, Y: 0.5 * (previous + current)}
-		paths[i] = PathData{
-			Start:   vector2.Point{X: point.X, Y: previous},
-			End:     vector2.Point{X: point.X, Y: current},
+		if options.Absolute {
+			lastPoint.Y = 0
+		}
+		// parsing the current optimised point
+		current, err := parseOrdinate(options.Data[i], command)
+		if err != nil {
+			return nil, err
+		}
+		// updating the last point
+		lastPoint.Y += current
+
+		// updating of the current point, since it corresponds to the last one
+		current = lastPoint.Y
+		// represents the middle of the path
+		middle := vector2.Point{X: lastPoint.X, Y: 0.5 * (previous + current)}
+		// adding the new path
+		paths = append(paths, PathData{
+			Start:   vector2.Point{X: lastPoint.X, Y: previous},
+			End:     vector2.Point{X: lastPoint.X, Y: current},
 			Control: [2]vector2.Point{middle, middle},
-		}
-		previous = point.X
+		})
+
+		// updating of the previous point, since it corresponds to the current one
+		previous = current
 	}
 
 	return paths, nil
 }
 
-func parseCurveTo(options parserOptions, point, initial *vector2.Point) ([]PathData, error) {
-	command := command(options, "C", "c")
+// parseCurveTo parses a "Cubic Bézier Curve" command
+func parseCurveTo(options parserOptions, lastPoint, initial *vector2.Point) ([]PathData, error) {
+	// represents the current command
+	command := command(options.Absolute, "C", "c")
 
+	// checks if there is no data to be parsed
+	// or if the data has invalid coordinates
 	if len(options.Data) == 0 {
 		return nil, newEmptyCoordinateError(command)
 	} else if len(options.Data)%6 != 0 {
 		return nil, newInvalidCoordinateError(command, options.Data)
 	}
 
-	previous := *point
+	// initial/previous point to next point (current)
+	previous := *lastPoint
+	// contain all the parsed paths
 	paths := make([]PathData, len(options.Data)/6)
 	var err error
+	// cycles through all the data this command contains
 	for i := 0; i < len(options.Data); i += 6 {
-		if options.Absolute {
-			point.Reset()
-		}
-
+		// parsing the current point and its control points
 		var points [3]vector2.Point
 		for j := range points {
 			k := i + j*2
-			points[j].X, err = strconv.ParseFloat(options.Data[k], 0)
+			points[j], err = parsePoint(options.Data[k], options.Data[k+1], command)
 			if err != nil {
-				return nil, newInvalidXError(command, options.Data[k])
-			}
-			points[j].Y, err = strconv.ParseFloat(options.Data[k+1], 0)
-			if err != nil {
-				return nil, newInvalidYError(command, options.Data[k+1])
+				return nil, err
 			}
 		}
 
-		current := *point
-		end := current.Add(points[2])
+		if options.Absolute {
+			lastPoint.Reset()
+		}
+		// last parsed point
+		last := *lastPoint
+		// current parsed point
+		current := last.Add(points[2])
+		// adding the new path
 		paths[i/6] = PathData{
 			Start:   previous,
-			End:     end,
-			Control: [2]vector2.Point{current.Add(points[0]), current.Add(points[1])},
+			End:     current,
+			Control: [2]vector2.Point{last.Add(points[0]), last.Add(points[1])},
 		}
-		previous = end
 
-		point.X = end.X
-		point.Y = end.Y
+		// updating of the previous point, since it corresponds to the current one
+		previous = current
+		// updating of the last point, since it corresponds to the current one
+		*lastPoint = current
 	}
 
 	return paths, nil
 }
 
+// parseClosePath parses a "ClosePath" command
 func parseClosePath(start, end vector2.Point, current *vector2.Point) PathData {
 	middle := vector2.Point{X: 0.5 * (start.X + end.X), Y: 0.5 * (start.Y + end.Y)}
-	current.X = start.X
-	current.Y = start.Y
+	*current = start
 
 	return PathData{
 		Start:   start,
@@ -365,68 +459,254 @@ func parseClosePath(start, end vector2.Point, current *vector2.Point) PathData {
 	}
 }
 
-func command(options parserOptions, absoluteCommand, relativeCommand string) string {
-	if options.Absolute {
+// command returns the current command depending on its relativity
+func command(absolute bool, absoluteCommand, relativeCommand string) string {
+	if absolute {
 		return absoluteCommand
 	}
 	return relativeCommand
 }
 
-// optimizePaths removes unnecessary paths
-func optimizePaths(paths []PathData, slopeTolerance float64) (optimizedPaths []PathData) {
-	for i := 0; i < len(paths); {
-		// index of the last acceptable path
-		lastPath := i
-
-		// cycles through the adjacent paths to the current one
-		for j := i + 1; j < len(paths); j++ {
-			var slopeDifference float64
-
-			// slope of the initial (i) and final (j) path
-			initialPathSlope := math.Abs(paths[i].Start.Slope(paths[i].End))
-			lastPathSlope := math.Abs(paths[j].Start.Slope(paths[j].End))
-
-			// checking some special cases
-			if math.IsInf(initialPathSlope, 1) && math.IsInf(lastPathSlope, 1) {
-				slopeDifference = 0
-			} else if math.IsInf(initialPathSlope, 1) && !math.IsInf(lastPathSlope, 1) {
-				slopeDifference = math.Inf(1)
-			} else {
-				// slope difference between the path to be tested and the last acceptable path
-				slopeDifference = math.Abs(lastPathSlope - initialPathSlope)
-			}
-
-			// checks if this path can be joined with the initial one
-			if slopeDifference < slopeTolerance {
-				lastPath = j
-			} else {
-				break
-			}
-		}
-
-		// checks if it is necessary to optimize the current path
-		if i != lastPath {
-			// joins the paths
-			middle := vector2.Point{
-				X: 0.5 * (paths[i].Start.X + paths[lastPath].End.X),
-				Y: 0.5 * (paths[i].Start.Y + paths[lastPath].End.Y),
-			}
-			optimizedPaths = append(optimizedPaths, PathData{
-				Start:   paths[i].Start,
-				End:     paths[lastPath].End,
-				Control: [2]vector2.Point{middle, middle},
-			})
-
-			// skips the already "removed" paths
-			i = lastPath + 1
-			continue
-		}
-
-		// no optimization is required in this path
-		optimizedPaths = append(optimizedPaths, paths[i])
-
-		// go to the next path
-		i++
+// optimizePoints removes unnecessary points
+func optimizePoints(previousPoint vector2.Point, lastPoint vector2.Point, currentIndex int, command string, options parserOptions) (int, error) {
+	// temporary copy of the last point
+	tempPoint := lastPoint
+	if options.Absolute {
+		tempPoint.Reset()
 	}
-	return
+
+	// parsing the current point
+	currentPoint, err := parsePoint(options.Data[currentIndex], options.Data[currentIndex+1], command)
+	if err != nil {
+		return 0, err
+	}
+	currentPoint.Add(tempPoint)
+
+	// current optimised point index
+	optimisedPointIndex := currentIndex
+	// cycles through the adjacent points to the current one
+	for i := currentIndex + 2; i < len(options.Data); i += 2 {
+		// temporary copy of the last point
+		tempPoint = lastPoint
+		if options.Absolute {
+			tempPoint.Reset()
+		}
+
+		// parsing the current optimised point
+		// used to check the possibility of replacing the current point
+		currentOptimised, err := parsePoint(options.Data[i], options.Data[i+1], command)
+		if err != nil {
+			return 0, err
+		}
+		currentOptimised.Add(tempPoint)
+
+		// represents the slope difference between the initial path and the "last" path being tested
+		var slopeDifference float64
+
+		// slope of the initial (previous + current) and "final" (current + lastPoint) path
+		initialPathSlope := math.Abs(previousPoint.Slope(currentPoint))
+		lastPathSlope := math.Abs(currentPoint.Slope(currentOptimised))
+
+		// checking some special cases
+		if math.IsInf(initialPathSlope, 1) && math.IsInf(lastPathSlope, 1) {
+			// reaching here means that both paths are vertically aligned
+			slopeDifference = 0
+		} else {
+			// slope difference calculation
+			slopeDifference = math.Abs(lastPathSlope - initialPathSlope)
+		}
+
+		// checks if this path can be joined with the initial one
+		// this means that, within the given tolerance, this point could be joined with the initial one without any loss of information
+		if slopeDifference < options.SlopeTolerance {
+			// updates the current optimised
+			optimisedPointIndex = i
+		} else {
+			break
+		}
+	}
+	return optimisedPointIndex, nil
+}
+
+// optimizeHorizontalPoints removes unnecessary horizontal points
+func optimizeHorizontalPoints(previousAbscissa float64, lastPoint vector2.Point, currentIndex int, command string, options parserOptions) (int, error) {
+	// temporary copy of the last point
+	tempPoint := lastPoint
+	if options.Absolute {
+		tempPoint.X = 0
+	}
+
+	// parsing the current point
+	currentPointAbscissa, err := parseAbscissa(options.Data[currentIndex], command)
+	if err != nil {
+		return 0, err
+	}
+	currentPoint := vector2.Point{
+		X: currentPointAbscissa + tempPoint.X,
+		Y: tempPoint.Y,
+	}
+
+	// initial point
+	previousPoint := vector2.Point{
+		X: previousAbscissa,
+		Y: tempPoint.Y,
+	}
+
+	// current optimised point index
+	optimisedPointIndex := currentIndex
+	// cycles through the adjacent points to the current one
+	for i := currentIndex + 1; i < len(options.Data); i++ {
+		// temporary copy of the last point
+		tempPoint := lastPoint
+		if options.Absolute {
+			tempPoint.X = 0
+		}
+
+		// parsing the current optimised point
+		// used to check the possibility of replacing the current point
+		currentOptimisedAbscissa, err := parseAbscissa(options.Data[i], command)
+		if err != nil {
+			return 0, err
+		}
+		currentOptimised := vector2.Point{
+			X: currentOptimisedAbscissa + tempPoint.X,
+			Y: tempPoint.Y,
+		}
+
+		// represents the slope difference between the initial path and the "last" path being tested
+		var slopeDifference float64
+
+		// slope of the initial (previous + current) and "final" (current + lastPoint) path
+		initialPathSlope := math.Abs(previousPoint.Slope(currentPoint))
+		lastPathSlope := math.Abs(currentPoint.Slope(currentOptimised))
+
+		// checking some special cases
+		if math.IsInf(initialPathSlope, 1) && math.IsInf(lastPathSlope, 1) {
+			// reaching here means that both paths are vertically aligned
+			slopeDifference = 0
+		} else {
+			// slope difference calculation
+			slopeDifference = math.Abs(lastPathSlope - initialPathSlope)
+		}
+
+		// checks if this path can be joined with the initial one
+		// this means that, within the given tolerance, this point could be joined with the initial one without any loss of information
+		if slopeDifference < options.SlopeTolerance {
+			// updates the current optimised
+			optimisedPointIndex = i
+		} else {
+			break
+		}
+	}
+	return optimisedPointIndex, nil
+}
+
+// optimizeVerticalPoints removes unnecessary vertical points
+func optimizeVerticalPoints(previousOrdinate float64, lastPoint vector2.Point, currentIndex int, command string, options parserOptions) (int, error) {
+	// temporary copy of the last point
+	tempPoint := lastPoint
+	if options.Absolute {
+		tempPoint.Y = 0
+	}
+
+	// parsing the current point
+	currentPointOrdinate, err := parseOrdinate(options.Data[currentIndex], command)
+	if err != nil {
+		return 0, err
+	}
+	currentPoint := vector2.Point{
+		X: tempPoint.X,
+		Y: currentPointOrdinate + tempPoint.Y,
+	}
+
+	// initial point
+	previousPoint := vector2.Point{
+		X: tempPoint.X,
+		Y: previousOrdinate,
+	}
+
+	// current optimised point index
+	optimisedPointIndex := currentIndex
+	// cycles through the adjacent points to the current one
+	for i := currentIndex + 1; i < len(options.Data); i++ {
+		// temporary copy of the last point
+		tempPoint := lastPoint
+		if options.Absolute {
+			tempPoint.Y = 0
+		}
+
+		// parsing the current optimised point
+		// used to check the possibility of replacing the current point
+		currentOptimisedOrdinate, err := parseOrdinate(options.Data[currentIndex], command)
+		if err != nil {
+			return 0, err
+		}
+		currentOptimised := vector2.Point{
+			X: tempPoint.X,
+			Y: currentOptimisedOrdinate + tempPoint.Y,
+		}
+
+		// represents the slope difference between the initial path and the "last" path being tested
+		var slopeDifference float64
+
+		// slope of the initial (previous + current) and "final" (current + lastPoint) path
+		initialPathSlope := math.Abs(previousPoint.Slope(currentPoint))
+		lastPathSlope := math.Abs(currentPoint.Slope(currentOptimised))
+
+		// checking some special cases
+		if math.IsInf(initialPathSlope, 1) && math.IsInf(lastPathSlope, 1) {
+			// reaching here means that both paths are vertically aligned
+			slopeDifference = 0
+		} else {
+			// slope difference calculation
+			slopeDifference = math.Abs(lastPathSlope - initialPathSlope)
+		}
+
+		// checks if this path can be joined with the initial one
+		// this means that, within the given tolerance, this point could be joined with the initial one without any loss of information
+		if slopeDifference < options.SlopeTolerance {
+			// updates the current optimised
+			optimisedPointIndex = i
+		} else {
+			break
+		}
+	}
+	return optimisedPointIndex, nil
+}
+
+// parsePoint parses the given x and y axes and returns a Point
+func parsePoint(x, y, command string) (vector2.Point, error) {
+	xAxis, err := parseAbscissa(x, command)
+	if err != nil {
+		return vector2.Point{}, err
+	}
+	yAxis, err := parseOrdinate(y, command)
+	if err != nil {
+		return vector2.Point{}, err
+	}
+
+	return vector2.Point{
+		X: xAxis,
+		Y: yAxis,
+	}, nil
+}
+
+// parseAbscissa parses the given x-axes and returns its value
+func parseAbscissa(x, command string) (float64, error) {
+	axis, err := strconv.ParseFloat(x, 0)
+	if err != nil {
+		return 0, newInvalidXError(command, x)
+	}
+
+	return axis, nil
+}
+
+// parseOrdinate parses the given y-axes and returns its value
+func parseOrdinate(y, command string) (float64, error) {
+	axis, err := strconv.ParseFloat(y, 0)
+	if err != nil {
+		return 0, newInvalidYError(command, y)
+	}
+
+	return axis, nil
 }
