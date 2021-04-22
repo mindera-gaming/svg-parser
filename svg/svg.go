@@ -32,6 +32,14 @@ type element struct {
 	Value   []byte `xml:",innerxml"`
 }
 
+// Path represents a customised path structure
+type Path struct {
+	// ID contains the identifier of a set of paths
+	ID string
+	// Data contains a set of paths
+	Data []PathData
+}
+
 // ParserOptions are used to configure the parse of the SVG
 type ParserOptions struct {
 	// tolerance to ignore path nodes that are probably not visible to the naked eye
@@ -40,11 +48,14 @@ type ParserOptions struct {
 
 // ParsePath deserialises the SVG data and returns a set of paths
 func ParsePath(data []byte, options ParserOptions) ([]Path, error) {
+	// unmarshalling the xml data
 	svg := svg{}
 	if err := xml.Unmarshal(data, &svg); err != nil {
 		return nil, err
 	}
 
+	// validates the tolerance value
+	// it can never be less than zero
 	options.SlopeTolerance = mathf.Max(0, options.SlopeTolerance)
 
 	return parseElements(svg.Elements, options)
@@ -67,7 +78,7 @@ func parseElements(elements []element, options ParserOptions) ([]Path, error) {
 			}
 			path.Clean()
 			var pathData []PathData
-			pathData, err = path.Parse(options.SlopeTolerance)
+			pathData, err = path.Parse(options)
 			newPaths = append(newPaths, Path{
 				ID:   path.ID,
 				Data: pathData,
