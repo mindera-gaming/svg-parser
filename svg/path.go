@@ -168,7 +168,8 @@ func parseMoveTo(options parserOptions, lastPoint, initial *vector2.Point) ([]Pa
 		return nil, err
 	}
 	// updating the last point
-	lastPoint.Add(previous)
+	lastPoint.X += previous.X
+	lastPoint.Y += previous.Y
 
 	// updating the initial point
 	*initial = *lastPoint
@@ -200,7 +201,8 @@ func parseMoveTo(options parserOptions, lastPoint, initial *vector2.Point) ([]Pa
 			return nil, err
 		}
 		// updating the last point
-		lastPoint.Add(current)
+		lastPoint.X += current.X
+		lastPoint.X += current.Y
 
 		// updating of the current point, since it corresponds to the last one
 		current = *lastPoint
@@ -260,7 +262,8 @@ func parseLineTo(options parserOptions, lastPoint, initial *vector2.Point) ([]Pa
 			return nil, err
 		}
 		// updating the last point
-		lastPoint.Add(current)
+		lastPoint.X += current.X
+		lastPoint.Y += current.Y
 
 		// updating of the current point, since it corresponds to the last one
 		current = *lastPoint
@@ -467,7 +470,7 @@ func command(absolute bool, absoluteCommand, relativeCommand string) string {
 	return relativeCommand
 }
 
-// optimizePoints removes unnecessary points
+// optimizePoints ignores unnecessary points
 func optimizePoints(previousPoint vector2.Point, lastPoint vector2.Point, currentIndex int, command string, options parserOptions) (int, error) {
 	// temporary copy of the last point
 	tempPoint := lastPoint
@@ -480,7 +483,8 @@ func optimizePoints(previousPoint vector2.Point, lastPoint vector2.Point, curren
 	if err != nil {
 		return 0, err
 	}
-	currentPoint.Add(tempPoint)
+	currentPoint.X += tempPoint.X
+	currentPoint.Y += tempPoint.Y
 
 	// current optimised point index
 	optimisedPointIndex := currentIndex
@@ -498,7 +502,8 @@ func optimizePoints(previousPoint vector2.Point, lastPoint vector2.Point, curren
 		if err != nil {
 			return 0, err
 		}
-		currentOptimised.Add(tempPoint)
+		currentOptimised.X += tempPoint.X
+		currentOptimised.Y += tempPoint.Y
 
 		// represents the slope difference between the initial path and the "last" path being tested
 		var slopeDifference float64
@@ -528,7 +533,7 @@ func optimizePoints(previousPoint vector2.Point, lastPoint vector2.Point, curren
 	return optimisedPointIndex, nil
 }
 
-// optimizeHorizontalPoints removes unnecessary horizontal points
+// optimizeHorizontalPoints ignores unnecessary horizontal points
 func optimizeHorizontalPoints(previousAbscissa float64, lastPoint vector2.Point, currentIndex int, command string, options parserOptions) (int, error) {
 	// temporary copy of the last point
 	tempPoint := lastPoint
@@ -601,7 +606,7 @@ func optimizeHorizontalPoints(previousAbscissa float64, lastPoint vector2.Point,
 	return optimisedPointIndex, nil
 }
 
-// optimizeVerticalPoints removes unnecessary vertical points
+// optimizeVerticalPoints ignores unnecessary vertical points
 func optimizeVerticalPoints(previousOrdinate float64, lastPoint vector2.Point, currentIndex int, command string, options parserOptions) (int, error) {
 	// temporary copy of the last point
 	tempPoint := lastPoint
