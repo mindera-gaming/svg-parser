@@ -181,15 +181,9 @@ func parseMoveTo(options parserOptions, lastPoint, initial *vector2.Point) ([]Pa
 	// cycles through all the data this command contains
 	for i := 2; i < len(options.Data); i += 2 {
 		// current optimised point index
-		currentIndex, err := optimizePoints(previous, *lastPoint, i, command, options)
+		i, err = optimizePoints(previous, *lastPoint, i, command, options)
 		if err != nil {
 			return nil, err
-		}
-
-		// checks if there has been any optimisation
-		if i != currentIndex {
-			// sets the index of the optimised point
-			i = currentIndex
 		}
 
 		if options.Absolute {
@@ -239,18 +233,13 @@ func parseLineTo(options parserOptions, lastPoint, initial *vector2.Point) ([]Pa
 	previous := *lastPoint
 	// contain all the parsed paths
 	var paths []PathData
+	var err error
 	// cycles through all the data this command contains
 	for i := 0; i < len(options.Data); i += 2 {
 		// current optimised point index
-		currentIndex, err := optimizePoints(previous, *lastPoint, i, command, options)
+		i, err = optimizePoints(previous, *lastPoint, i, command, options)
 		if err != nil {
 			return nil, err
-		}
-
-		// checks if there has been any optimisation
-		if i != currentIndex {
-			// sets the index of the optimised point
-			i = currentIndex
 		}
 
 		if options.Absolute {
@@ -297,25 +286,20 @@ func parseHorizontalTo(options parserOptions, lastPoint, initial *vector2.Point)
 	previous := lastPoint.X
 	// contain all the parsed paths
 	var paths []PathData
+	var err error
 	// cycles through all the data this command contains
 	for i := 0; i < len(options.Data); i++ {
 		// current optimised point index
-		currentIndex, err := optimizeHorizontalPoints(previous, *lastPoint, i, command, options)
+		i, err = optimizeHorizontalPoints(previous, *lastPoint, i, command, options)
 		if err != nil {
 			return nil, err
-		}
-
-		// checks if there has been any optimisation
-		if i != currentIndex {
-			// sets the index of the optimised point
-			i = currentIndex
 		}
 
 		if options.Absolute {
 			lastPoint.X = 0
 		}
 		// parsing the current optimised point
-		current, err := parseAbscissa(options.Data[i], command)
+		current, err := parseX(options.Data[i], command)
 		if err != nil {
 			return nil, err
 		}
@@ -354,25 +338,20 @@ func parseVerticalTo(options parserOptions, lastPoint, initial *vector2.Point) (
 	previous := lastPoint.Y
 	// contain all the parsed paths
 	var paths []PathData
+	var err error
 	// cycles through all the data this command contains
 	for i := 0; i < len(options.Data); i++ {
 		// current optimised point index
-		currentIndex, err := optimizeVerticalPoints(previous, *lastPoint, i, command, options)
+		i, err = optimizeVerticalPoints(previous, *lastPoint, i, command, options)
 		if err != nil {
 			return nil, err
-		}
-
-		// checks if there has been any optimisation
-		if i != currentIndex {
-			// sets the index of the optimised point
-			i = currentIndex
 		}
 
 		if options.Absolute {
 			lastPoint.Y = 0
 		}
 		// parsing the current optimised point
-		current, err := parseOrdinate(options.Data[i], command)
+		current, err := parseY(options.Data[i], command)
 		if err != nil {
 			return nil, err
 		}
@@ -542,7 +521,7 @@ func optimizeHorizontalPoints(previousAbscissa float64, lastPoint vector2.Point,
 	}
 
 	// parsing the current point
-	currentPointAbscissa, err := parseAbscissa(options.Data[currentIndex], command)
+	currentPointAbscissa, err := parseX(options.Data[currentIndex], command)
 	if err != nil {
 		return 0, err
 	}
@@ -569,7 +548,7 @@ func optimizeHorizontalPoints(previousAbscissa float64, lastPoint vector2.Point,
 
 		// parsing the current optimised point
 		// used to check the possibility of replacing the current point
-		currentOptimisedAbscissa, err := parseAbscissa(options.Data[i], command)
+		currentOptimisedAbscissa, err := parseX(options.Data[i], command)
 		if err != nil {
 			return 0, err
 		}
@@ -615,7 +594,7 @@ func optimizeVerticalPoints(previousOrdinate float64, lastPoint vector2.Point, c
 	}
 
 	// parsing the current point
-	currentPointOrdinate, err := parseOrdinate(options.Data[currentIndex], command)
+	currentPointOrdinate, err := parseY(options.Data[currentIndex], command)
 	if err != nil {
 		return 0, err
 	}
@@ -642,7 +621,7 @@ func optimizeVerticalPoints(previousOrdinate float64, lastPoint vector2.Point, c
 
 		// parsing the current optimised point
 		// used to check the possibility of replacing the current point
-		currentOptimisedOrdinate, err := parseOrdinate(options.Data[currentIndex], command)
+		currentOptimisedOrdinate, err := parseY(options.Data[currentIndex], command)
 		if err != nil {
 			return 0, err
 		}
@@ -681,11 +660,11 @@ func optimizeVerticalPoints(previousOrdinate float64, lastPoint vector2.Point, c
 
 // parsePoint parses the given x and y axes and returns a Point
 func parsePoint(x, y, command string) (vector2.Point, error) {
-	xAxis, err := parseAbscissa(x, command)
+	xAxis, err := parseX(x, command)
 	if err != nil {
 		return vector2.Point{}, err
 	}
-	yAxis, err := parseOrdinate(y, command)
+	yAxis, err := parseY(y, command)
 	if err != nil {
 		return vector2.Point{}, err
 	}
@@ -696,8 +675,8 @@ func parsePoint(x, y, command string) (vector2.Point, error) {
 	}, nil
 }
 
-// parseAbscissa parses the given x-axes and returns its value
-func parseAbscissa(x, command string) (float64, error) {
+// parseX parses the given x-axes and returns its value
+func parseX(x, command string) (float64, error) {
 	axis, err := strconv.ParseFloat(x, 0)
 	if err != nil {
 		return 0, newInvalidXError(command, x)
@@ -706,8 +685,8 @@ func parseAbscissa(x, command string) (float64, error) {
 	return axis, nil
 }
 
-// parseOrdinate parses the given y-axes and returns its value
-func parseOrdinate(y, command string) (float64, error) {
+// parseY parses the given y-axes and returns its value
+func parseY(y, command string) (float64, error) {
 	axis, err := strconv.ParseFloat(y, 0)
 	if err != nil {
 		return 0, newInvalidYError(command, y)
