@@ -469,12 +469,6 @@ func optimizePoints(previousPoint vector2.Point, lastPoint vector2.Point, curren
 	optimisedPointIndex := currentIndex
 	// cycles through the adjacent points to the current one
 	for i := currentIndex + 2; i < len(options.Data); i += 2 {
-		// temporary copy of the last point
-		tempPoint = lastPoint
-		if options.Absolute {
-			tempPoint.Reset()
-		}
-
 		// parsing the current optimised point
 		// used to check the possibility of replacing the current point
 		currentOptimised, err := parsePoint(options.Data[i], options.Data[i+1], command)
@@ -540,12 +534,6 @@ func optimizeHorizontalPoints(previousAbscissa float64, lastPoint vector2.Point,
 	optimisedPointIndex := currentIndex
 	// cycles through the adjacent points to the current one
 	for i := currentIndex + 1; i < len(options.Data); i++ {
-		// temporary copy of the last point
-		tempPoint := lastPoint
-		if options.Absolute {
-			tempPoint.X = 0
-		}
-
 		// parsing the current optimised point
 		// used to check the possibility of replacing the current point
 		currentOptimisedAbscissa, err := parseX(options.Data[i], command)
@@ -613,12 +601,6 @@ func optimizeVerticalPoints(previousOrdinate float64, lastPoint vector2.Point, c
 	optimisedPointIndex := currentIndex
 	// cycles through the adjacent points to the current one
 	for i := currentIndex + 1; i < len(options.Data); i++ {
-		// temporary copy of the last point
-		tempPoint := lastPoint
-		if options.Absolute {
-			tempPoint.Y = 0
-		}
-
 		// parsing the current optimised point
 		// used to check the possibility of replacing the current point
 		currentOptimisedOrdinate, err := parseY(options.Data[currentIndex], command)
