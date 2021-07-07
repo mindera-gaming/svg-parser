@@ -9,13 +9,13 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mindera-gaming/go-math/vector2"
+	vector "github.com/mindera-gaming/go-math/vector2"
 )
 
 // PathData represents the "d" attribute that defines a path to be drawn
 type PathData struct {
-	Start, End vector2.Point
-	Control    [2]vector2.Point
+	Start, End vector.Vector2
+	Control    [2]vector.Vector2
 }
 
 // parserOptions are essential for the parse of the different commands
@@ -56,8 +56,8 @@ func (p path) Parse(options ParserOptions) ([]PathData, error) {
 
 	var currentAbsolute bool
 	var start int
-	var current, initial vector2.Point
-	var parser = func(options parserOptions, current, initial *vector2.Point) ([]PathData, error) { return nil, nil }
+	var current, initial vector.Vector2
+	var parser = func(options parserOptions, current, initial *vector.Vector2) ([]PathData, error) { return nil, nil }
 	var updatePaths = func(end int) (err error) {
 		options := newParserOptions(options, p.Data, start, end, currentAbsolute)
 
@@ -132,7 +132,7 @@ func (p path) Parse(options ParserOptions) ([]PathData, error) {
 				return nil, err
 			}
 
-			parser = func(parserOptions, *vector2.Point, *vector2.Point) ([]PathData, error) { return nil, nil }
+			parser = func(parserOptions, *vector.Vector2, *vector.Vector2) ([]PathData, error) { return nil, nil }
 			paths = append(paths, parseClosePath(current, initial, &current))
 		}
 	}
@@ -145,7 +145,7 @@ func (p path) Parse(options ParserOptions) ([]PathData, error) {
 }
 
 // parseMoveTo parses a "MoveTo" command
-func parseMoveTo(options parserOptions, lastPoint, initial *vector2.Point) ([]PathData, error) {
+func parseMoveTo(options parserOptions, lastPoint, initial *vector.Vector2) ([]PathData, error) {
 	// represents the current command
 	command := command(options.Absolute, "M", "m")
 
@@ -201,12 +201,12 @@ func parseMoveTo(options parserOptions, lastPoint, initial *vector2.Point) ([]Pa
 		// updating of the current point, since it corresponds to the last one
 		current = *lastPoint
 		// represents the middle of the path
-		middle := vector2.Point{X: 0.5 * (previous.X + current.X), Y: 0.5 * (previous.Y + current.Y)}
+		middle := vector.Vector2{X: 0.5 * (previous.X + current.X), Y: 0.5 * (previous.Y + current.Y)}
 		// adding the new path
 		paths = append(paths, PathData{
 			Start:   previous,
 			End:     current,
-			Control: [2]vector2.Point{middle, middle},
+			Control: [2]vector.Vector2{middle, middle},
 		})
 
 		// updating of the previous point, since it corresponds to the current one
@@ -217,7 +217,7 @@ func parseMoveTo(options parserOptions, lastPoint, initial *vector2.Point) ([]Pa
 }
 
 // parseLineTo parses a "LineTo" command
-func parseLineTo(options parserOptions, lastPoint, initial *vector2.Point) ([]PathData, error) {
+func parseLineTo(options parserOptions, lastPoint, initial *vector.Vector2) ([]PathData, error) {
 	// represents the current command
 	command := command(options.Absolute, "L", "l")
 
@@ -257,12 +257,12 @@ func parseLineTo(options parserOptions, lastPoint, initial *vector2.Point) ([]Pa
 		// updating of the current point, since it corresponds to the last one
 		current = *lastPoint
 		// represents the middle of the path
-		middle := vector2.Point{X: 0.5 * (previous.X + current.X), Y: 0.5 * (previous.Y + current.Y)}
+		middle := vector.Vector2{X: 0.5 * (previous.X + current.X), Y: 0.5 * (previous.Y + current.Y)}
 		// adding the new path
 		paths = append(paths, PathData{
 			Start:   previous,
 			End:     current,
-			Control: [2]vector2.Point{middle, middle},
+			Control: [2]vector.Vector2{middle, middle},
 		})
 
 		// updating of the previous point, since it corresponds to the current one
@@ -273,7 +273,7 @@ func parseLineTo(options parserOptions, lastPoint, initial *vector2.Point) ([]Pa
 }
 
 // parseHorizontalTo parses a horizontal "LineTo" command
-func parseHorizontalTo(options parserOptions, lastPoint, initial *vector2.Point) ([]PathData, error) {
+func parseHorizontalTo(options parserOptions, lastPoint, initial *vector.Vector2) ([]PathData, error) {
 	// represents the current command
 	command := command(options.Absolute, "H", "h")
 
@@ -309,12 +309,12 @@ func parseHorizontalTo(options parserOptions, lastPoint, initial *vector2.Point)
 		// updating of the current point, since it corresponds to the last one
 		current = lastPoint.X
 		// represents the middle of the path
-		middle := vector2.Point{X: 0.5 * (previous + current), Y: lastPoint.Y}
+		middle := vector.Vector2{X: 0.5 * (previous + current), Y: lastPoint.Y}
 		// adding the new path
 		paths = append(paths, PathData{
-			Start:   vector2.Point{X: previous, Y: lastPoint.Y},
-			End:     vector2.Point{X: current, Y: lastPoint.Y},
-			Control: [2]vector2.Point{middle, middle},
+			Start:   vector.Vector2{X: previous, Y: lastPoint.Y},
+			End:     vector.Vector2{X: current, Y: lastPoint.Y},
+			Control: [2]vector.Vector2{middle, middle},
 		})
 
 		// updating of the previous point, since it corresponds to the current one
@@ -325,7 +325,7 @@ func parseHorizontalTo(options parserOptions, lastPoint, initial *vector2.Point)
 }
 
 // parseVerticalTo parses a vertical "LineTo" command
-func parseVerticalTo(options parserOptions, lastPoint, initial *vector2.Point) ([]PathData, error) {
+func parseVerticalTo(options parserOptions, lastPoint, initial *vector.Vector2) ([]PathData, error) {
 	// represents the current command
 	command := command(options.Absolute, "V", "v")
 
@@ -361,12 +361,12 @@ func parseVerticalTo(options parserOptions, lastPoint, initial *vector2.Point) (
 		// updating of the current point, since it corresponds to the last one
 		current = lastPoint.Y
 		// represents the middle of the path
-		middle := vector2.Point{X: lastPoint.X, Y: 0.5 * (previous + current)}
+		middle := vector.Vector2{X: lastPoint.X, Y: 0.5 * (previous + current)}
 		// adding the new path
 		paths = append(paths, PathData{
-			Start:   vector2.Point{X: lastPoint.X, Y: previous},
-			End:     vector2.Point{X: lastPoint.X, Y: current},
-			Control: [2]vector2.Point{middle, middle},
+			Start:   vector.Vector2{X: lastPoint.X, Y: previous},
+			End:     vector.Vector2{X: lastPoint.X, Y: current},
+			Control: [2]vector.Vector2{middle, middle},
 		})
 
 		// updating of the previous point, since it corresponds to the current one
@@ -377,7 +377,7 @@ func parseVerticalTo(options parserOptions, lastPoint, initial *vector2.Point) (
 }
 
 // parseCurveTo parses a "Cubic Bézier Curve" command
-func parseCurveTo(options parserOptions, lastPoint, initial *vector2.Point) ([]PathData, error) {
+func parseCurveTo(options parserOptions, lastPoint, initial *vector.Vector2) ([]PathData, error) {
 	// represents the current command
 	command := command(options.Absolute, "C", "c")
 
@@ -397,7 +397,7 @@ func parseCurveTo(options parserOptions, lastPoint, initial *vector2.Point) ([]P
 	// cycles through all the data this command contains
 	for i := 0; i < len(options.Data); i += 6 {
 		// parsing the current point and its control points
-		var points [3]vector2.Point
+		var points [3]vector.Vector2
 		for j := range points {
 			k := i + j*2
 			points[j], err = parsePoint(options.Data[k], options.Data[k+1], command)
@@ -417,7 +417,7 @@ func parseCurveTo(options parserOptions, lastPoint, initial *vector2.Point) ([]P
 		paths[i/6] = PathData{
 			Start:   previous,
 			End:     current,
-			Control: [2]vector2.Point{last.Add(points[0]), last.Add(points[1])},
+			Control: [2]vector.Vector2{last.Add(points[0]), last.Add(points[1])},
 		}
 
 		// updating of the previous point, since it corresponds to the current one
@@ -430,14 +430,14 @@ func parseCurveTo(options parserOptions, lastPoint, initial *vector2.Point) ([]P
 }
 
 // parseClosePath parses a "ClosePath" command
-func parseClosePath(start, end vector2.Point, current *vector2.Point) PathData {
-	middle := vector2.Point{X: 0.5 * (start.X + end.X), Y: 0.5 * (start.Y + end.Y)}
+func parseClosePath(start, end vector.Vector2, current *vector.Vector2) PathData {
+	middle := vector.Vector2{X: 0.5 * (start.X + end.X), Y: 0.5 * (start.Y + end.Y)}
 	*current = start
 
 	return PathData{
 		Start:   start,
 		End:     end,
-		Control: [2]vector2.Point{middle, middle},
+		Control: [2]vector.Vector2{middle, middle},
 	}
 }
 
@@ -450,7 +450,7 @@ func command(absolute bool, absoluteCommand, relativeCommand string) string {
 }
 
 // optimizePoints ignores unnecessary points
-func optimizePoints(previousPoint vector2.Point, lastPoint vector2.Point, currentIndex int, command string, options parserOptions) (int, error) {
+func optimizePoints(previousPoint vector.Vector2, lastPoint vector.Vector2, currentIndex int, command string, options parserOptions) (int, error) {
 	// temporary copy of the last point
 	tempPoint := lastPoint
 	if options.Absolute {
@@ -507,7 +507,7 @@ func optimizePoints(previousPoint vector2.Point, lastPoint vector2.Point, curren
 }
 
 // optimizeHorizontalPoints ignores unnecessary horizontal points
-func optimizeHorizontalPoints(previousAbscissa float64, lastPoint vector2.Point, currentIndex int, command string, options parserOptions) (int, error) {
+func optimizeHorizontalPoints(previousAbscissa float64, lastPoint vector.Vector2, currentIndex int, command string, options parserOptions) (int, error) {
 	// temporary copy of the last point
 	tempPoint := lastPoint
 	if options.Absolute {
@@ -519,13 +519,13 @@ func optimizeHorizontalPoints(previousAbscissa float64, lastPoint vector2.Point,
 	if err != nil {
 		return 0, err
 	}
-	currentPoint := vector2.Point{
+	currentPoint := vector.Vector2{
 		X: currentPointAbscissa + tempPoint.X,
 		Y: tempPoint.Y,
 	}
 
 	// initial point
-	previousPoint := vector2.Point{
+	previousPoint := vector.Vector2{
 		X: previousAbscissa,
 		Y: tempPoint.Y,
 	}
@@ -540,7 +540,7 @@ func optimizeHorizontalPoints(previousAbscissa float64, lastPoint vector2.Point,
 		if err != nil {
 			return 0, err
 		}
-		currentOptimised := vector2.Point{
+		currentOptimised := vector.Vector2{
 			X: currentOptimisedAbscissa + tempPoint.X,
 			Y: tempPoint.Y,
 		}
@@ -574,7 +574,7 @@ func optimizeHorizontalPoints(previousAbscissa float64, lastPoint vector2.Point,
 }
 
 // optimizeVerticalPoints ignores unnecessary vertical points
-func optimizeVerticalPoints(previousOrdinate float64, lastPoint vector2.Point, currentIndex int, command string, options parserOptions) (int, error) {
+func optimizeVerticalPoints(previousOrdinate float64, lastPoint vector.Vector2, currentIndex int, command string, options parserOptions) (int, error) {
 	// temporary copy of the last point
 	tempPoint := lastPoint
 	if options.Absolute {
@@ -586,13 +586,13 @@ func optimizeVerticalPoints(previousOrdinate float64, lastPoint vector2.Point, c
 	if err != nil {
 		return 0, err
 	}
-	currentPoint := vector2.Point{
+	currentPoint := vector.Vector2{
 		X: tempPoint.X,
 		Y: currentPointOrdinate + tempPoint.Y,
 	}
 
 	// initial point
-	previousPoint := vector2.Point{
+	previousPoint := vector.Vector2{
 		X: tempPoint.X,
 		Y: previousOrdinate,
 	}
@@ -607,7 +607,7 @@ func optimizeVerticalPoints(previousOrdinate float64, lastPoint vector2.Point, c
 		if err != nil {
 			return 0, err
 		}
-		currentOptimised := vector2.Point{
+		currentOptimised := vector.Vector2{
 			X: tempPoint.X,
 			Y: currentOptimisedOrdinate + tempPoint.Y,
 		}
@@ -641,17 +641,17 @@ func optimizeVerticalPoints(previousOrdinate float64, lastPoint vector2.Point, c
 }
 
 // parsePoint parses the given x and y axes and returns a Point
-func parsePoint(x, y, command string) (vector2.Point, error) {
+func parsePoint(x, y, command string) (vector.Vector2, error) {
 	xAxis, err := parseX(x, command)
 	if err != nil {
-		return vector2.Point{}, err
+		return vector.Vector2{}, err
 	}
 	yAxis, err := parseY(y, command)
 	if err != nil {
-		return vector2.Point{}, err
+		return vector.Vector2{}, err
 	}
 
-	return vector2.Point{
+	return vector.Vector2{
 		X: xAxis,
 		Y: yAxis,
 	}, nil
