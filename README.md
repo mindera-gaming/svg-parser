@@ -15,7 +15,7 @@ go get github.com/mindera-gaming/svg-parser
 The `svg` package API exposes one function:
 
 ```go
-func ParsePath(data []byte) ([]Path, error)
+func ParsePath(data []byte, options ParserOptions) ([]Path, error) {
 ```
 
 The `ParsePath` takes an entire XML file as a `[]byte` and some `ParserOptions` settings.  
@@ -36,12 +36,14 @@ type Path struct {
 }
 
 type PathData struct {
-    Start, End Point
-    Control    [2]Point
+    Start   Vector2
+    End     Vector2
+    Control [2]Vector2
 }
 
-type Point struct {
-    X, Y float64
+type Vector2 struct {
+    X float64
+    Y float64
 }
 ```
 

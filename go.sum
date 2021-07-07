@@ -1,7 +1,4 @@
 github.com/google/uuid v1.2.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
-github.com/mindera-gaming/go-math v0.3.1-0.20210415155120-035b14358bf1 h1:2NfmQBwzd4ou9WF2a0A9iLugWAnBQYunW/jh4P31N84=
-github.com/mindera-gaming/go-math v0.3.1-0.20210415155120-035b14358bf1/go.mod h1:PJg9RurCr2rE3EN/0VLQYbnzT4j9Q/KC/xOSt4VBFrU=
-github.com/mindera-gaming/go-math v0.3.1-0.20210415162530-250cad3fc941 h1:osrVl/uUxMbY8MOCSgG8yKT0ttYTetfzROByhhwH/JU=
-github.com/mindera-gaming/go-math v0.3.1-0.20210415162530-250cad3fc941/go.mod h1:PJg9RurCr2rE3EN/0VLQYbnzT4j9Q/KC/xOSt4VBFrU=
-github.com/mindera-gaming/go-math v0.4.0 h1:j4rI0J/+iqgFYTH9JC9lr7x3ehR67B1+9aU+JSpfeqw=
-github.com/mindera-gaming/go-math v0.4.0/go.mod h1:PJg9RurCr2rE3EN/0VLQYbnzT4j9Q/KC/xOSt4VBFrU=
+github.com/mindera-gaming/go-data-structure v0.2.0/go.mod h1:S1/cwvSX84bL8YaYkEATKG1gZmPD3qgk+E3u8bdusq4=
+github.com/mindera-gaming/go-math v0.7.0 h1:RYsXXEgnR3blExhMJRI8igSyv+HywTIQhy+/+CCaHfE=
+github.com/mindera-gaming/go-math v0.7.0/go.mod h1:RmRfg1qywn3tqZGB6zOd5HW8g2Mti/bFFZxR6TXoZBc=
